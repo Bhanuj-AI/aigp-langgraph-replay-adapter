@@ -5,7 +5,7 @@ description = "AIGP LangGraph Replay Adapter that privately resolves snapshots, 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "bhanuj-governance-plugin-api>=1.1,<2",
+    "bhanuj-governance-plugin-api==1.1.1",
     "langgraph>=0.2.74,<1",
 ]
 
