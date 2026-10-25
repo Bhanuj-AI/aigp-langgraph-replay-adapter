@@ -1,0 +1,23 @@
+[project]
+name = "aigp-langgraph-replay-adapter"
+version = "0.1.0"
+description = "AIGP LangGraph Replay Adapter that privately resolves snapshots, executes isolated replay, and returns bounded results."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bhanuj-governance-plugin-api>=1.1,<2",
+    "langgraph>=0.2.74,<1",
+]
+
+[project.entry-points."bhanuj.governance.plugins"]
+langgraph-replay = "aigp_langgraph_replay_adapter.plugin:LangGraphReplayPlugin"
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.2"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aigp_langgraph_replay_adapter"]
