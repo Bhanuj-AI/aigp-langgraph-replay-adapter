@@ -29,11 +29,18 @@ class LangGraphReplayPlugin:
         self._snapshot_path = Path(path) if path else None
 
     def validate(self, context) -> None:
-        if self._snapshot_path is None:
-            raise ValueError("AIGP_LANGGRAPH_REPLAY_SNAPSHOT_DB must be configured.")
+        """Remain inert outside a configured replay-worker deployment.
+
+        Entry-point discovery also happens in API processes.  Configuration is
+        therefore required to contribute an executable adapter, not to import
+        or validate this optional worker plugin.  Without it, no adapter is
+        registered and governed replay fails closed as unavailable.
+        """
+        return
 
     def register(self, context) -> None:
-        assert self._snapshot_path is not None
+        if self._snapshot_path is None:
+            return
         adapter = LangGraphReplayAdapter(SQLitePrivateSnapshotStore(self._snapshot_path))
         context.contributions.replay_execution_adapters(
             (ReplayExecutionAdapterContribution("langgraph", "v1", adapter),)

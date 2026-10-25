@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import ClassVar, TypedDict
 
 from bhanuj_governance_plugin_api import (
     ReplayExecutionContext,
@@ -20,6 +20,11 @@ from aigp_langgraph_replay_adapter.snapshot_store import (
 
 class LangGraphReplayError(ValueError):
     """The LangGraph runtime rejected a governed replay request."""
+
+
+_RUNTIME_TYPE = "langgraph"
+_ADAPTER_ID = "langgraph/v1"
+_ADAPTER_VERSION = "1"
 
 
 class _ReplayState(TypedDict):
@@ -37,11 +42,11 @@ class LangGraphReplayAdapter:
     """
 
     snapshots: SQLitePrivateSnapshotStore
-    name: str = "langgraph/v1"
+    name: ClassVar[str] = _ADAPTER_ID
 
     def validate_configuration(self, source_execution: object, configuration: object) -> None:
         execution_adapter = getattr(configuration, "execution_adapter", None)
-        if execution_adapter != self.name:
+        if execution_adapter != _ADAPTER_ID:
             raise LangGraphReplayError(
                 "Frozen replay configuration selected a different runtime adapter."
             )
@@ -92,6 +97,7 @@ class LangGraphReplayAdapter:
             metadata={
                 "runtime_replay_attestation": {
                     "adapter_id": self.name,
+                    "adapter_version": _ADAPTER_VERSION,
                     "manifest_hash": source.manifest_hash,
                     "isolation_guarantee": source.isolation_guarantee,
                     "private_snapshot_integrity_verified": True,
@@ -106,9 +112,13 @@ class LangGraphReplayAdapter:
             raise LangGraphReplayError(
                 "Governed LangGraph replay requires RuntimeReplaySource/v1."
             )
-        if source.adapter_id != self.name or source.runtime_type != "langgraph":
+        if (
+            source.adapter_id != _ADAPTER_ID
+            or source.adapter_version != _ADAPTER_VERSION
+            or source.runtime_type != _RUNTIME_TYPE
+        ):
             raise LangGraphReplayError(
-                "Runtime replay source does not identify this LangGraph adapter."
+                "Runtime replay source does not identify this supported LangGraph adapter."
             )
         return source
 

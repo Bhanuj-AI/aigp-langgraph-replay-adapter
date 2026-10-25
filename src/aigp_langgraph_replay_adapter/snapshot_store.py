@@ -85,7 +85,12 @@ class SQLitePrivateSnapshotStore:
         manifest_hash: str,
         state: Mapping[str, Any],
     ) -> PrivateSnapshot:
-        """Store an immutable private copy, replacing only identical identity."""
+        """Store immutable private evidence; exact duplicate capture is idempotent.
+
+        The database, not a read-before-write check, arbitrates writers.  The
+        first successful insert owns a replay reference forever; later callers
+        may only prove that they supplied the identical binding and bytes.
+        """
         self.initialise()
         snapshot_json = _canonical_json(state)
         digest = _digest(snapshot_json)
@@ -102,38 +107,14 @@ class SQLitePrivateSnapshotStore:
             digest,
         )
         with self._connect() as connection:
-            existing = connection.execute(
-                """
-                SELECT organization_id, project_id, external_execution_id,
-                       adapter_id, adapter_version, isolation_guarantee,
-                       manifest_hash, snapshot_digest
-                FROM private_replay_snapshots
-                WHERE replay_reference = ?
-                """,
-                (replay_reference,),
-            ).fetchone()
-            if existing is not None:
-                existing_binding = tuple(str(value) for value in existing[:7])
-                requested_binding = (
-                    organization_id,
-                    project_id,
-                    external_execution_id,
-                    adapter_id,
-                    adapter_version,
-                    isolation_guarantee,
-                    manifest_hash,
-                )
-                if existing_binding != requested_binding or existing[7] != digest:
-                    raise PrivateSnapshotError(
-                        "Replay reference already identifies different private replay evidence."
-                    )
             connection.execute(
                 """
-                INSERT OR REPLACE INTO private_replay_snapshots (
+                INSERT INTO private_replay_snapshots (
                     replay_reference, organization_id, project_id,
                     external_execution_id, adapter_id, adapter_version,
                     isolation_guarantee, manifest_hash, snapshot_json, snapshot_digest
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(replay_reference) DO NOTHING
                 """,
                 (
                     replay_reference,
@@ -147,6 +128,32 @@ class SQLitePrivateSnapshotStore:
                     snapshot_json,
                     digest,
                 ),
+            )
+            existing = connection.execute(
+                """
+                SELECT organization_id, project_id, external_execution_id,
+                       adapter_id, adapter_version, isolation_guarantee,
+                       manifest_hash, snapshot_digest
+                FROM private_replay_snapshots
+                WHERE replay_reference = ?
+                """,
+                (replay_reference,),
+            ).fetchone()
+        if existing is None:
+            raise PrivateSnapshotError("Private replay snapshot insert did not persist.")
+        existing_binding = tuple(str(value) for value in existing[:7])
+        requested_binding = (
+            organization_id,
+            project_id,
+            external_execution_id,
+            adapter_id,
+            adapter_version,
+            isolation_guarantee,
+            manifest_hash,
+        )
+        if existing_binding != requested_binding or existing[7] != digest:
+            raise PrivateSnapshotError(
+                "Replay reference already identifies different private replay evidence."
             )
         return snapshot
 
@@ -206,7 +213,7 @@ class SQLitePrivateSnapshotStore:
         return snapshot
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._path)
+        return sqlite3.connect(self._path, timeout=10)
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:

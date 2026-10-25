@@ -19,7 +19,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bhanuj-governance-plugin-api", specifier = ">=1.1,<2" },
+    { name = "bhanuj-governance-plugin-api", specifier = "==1.1.1" },
     { name = "langgraph", specifier = ">=0.2.74,<1" },
 ]
 
@@ -53,11 +53,11 @@ wheels = [
 
 [[package]]
 name = "bhanuj-governance-plugin-api"
-version = "1.1.0"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/05/8f/c1345b7cbb90f98a30f342f48b5a57726d005653356460255a685951bdb6/bhanuj_governance_plugin_api-1.1.0.tar.gz", hash = "sha256:8c1e2e47355104169ca5e07d0e2f57160cd848832144f05dd25f87d0614b0024", size = 6713, upload-time = "2026-10-25T13:41:20.354Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/5a/21573d1397d7494db0cd1bdc22d60ee368f1ee79a67111c454e9dc7d8d6f/bhanuj_governance_plugin_api-1.1.1.tar.gz", hash = "sha256:6000cfca6c4006496e2ae50d45abfcc64ebeb7d376d427f5f30ccc85f92c8f1a", size = 10372, upload-time = "2026-10-25T22:50:37.236Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/c7/7888022c5d14211bc88f7ff792b99c20eec6fbc129850c2b7b28c18d11fb/bhanuj_governance_plugin_api-1.1.0-py3-none-any.whl", hash = "sha256:01e2e411d01c7ec0e084ec35a7b0a6c0e82a7585f52d4d43c373d517e823d079", size = 7755, upload-time = "2026-10-25T13:41:19.328Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/33/5626b5a160fef1f3be8664dbf94fb61e4fda9d0d3529227505012b0d67e4/bhanuj_governance_plugin_api-1.1.1-py3-none-any.whl", hash = "sha256:d6c26a8f73677f10b5b558212c63a141f192001f401b4ca0fed6777620e52300", size = 11814, upload-time = "2026-10-25T22:50:36.246Z" },
 ]
 
 [[package]]
