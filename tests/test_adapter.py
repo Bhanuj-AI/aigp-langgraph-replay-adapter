@@ -119,6 +119,17 @@ def test_isolated_langgraph_replay_preserves_original_banking_database(
         "private_snapshot_integrity_verified"
     ] is True
     assert result.metadata["runtime_replay_attestation"]["adapter_version"] == "1"
+    assert result.metadata["evidence_only_replay_safety"] == {
+        "schema_version": "evidence-only-replay-safety/v1",
+        "capability_schema_version": "evidence-only-replay-capability/v1",
+        "replay_manifest_hash": source.manifest_hash,
+        "isolation_guarantee": source.isolation_guarantee,
+        "intervention_digest": "sha256:intervention",
+        "runtime_tool_call_id": "approve-loan-1",
+        "private_snapshot_integrity_verified": True,
+        "unobserved_tool_call_count": 0,
+        "external_side_effects_performed": False,
+    }
 
 
 def test_private_snapshot_resolution_rejects_cross_tenant_and_binding_forgery(
