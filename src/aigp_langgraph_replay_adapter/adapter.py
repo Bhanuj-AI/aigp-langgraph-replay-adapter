@@ -95,6 +95,17 @@ class LangGraphReplayAdapter:
             artifact_refs=(outcome_ref,),
             runtime_parameters={"isolated": True},
             metadata={
+                "evidence_only_replay_safety": {
+                    "schema_version": "evidence-only-replay-safety/v1",
+                    "capability_schema_version": "evidence-only-replay-capability/v1",
+                    "replay_manifest_hash": source.manifest_hash,
+                    "isolation_guarantee": source.isolation_guarantee,
+                    "intervention_digest": envelope.intervention_digest,
+                    "runtime_tool_call_id": envelope.runtime_tool_call_id,
+                    "private_snapshot_integrity_verified": True,
+                    "unobserved_tool_call_count": 0,
+                    "external_side_effects_performed": False,
+                },
                 "runtime_replay_attestation": {
                     "adapter_id": self.name,
                     "adapter_version": _ADAPTER_VERSION,
