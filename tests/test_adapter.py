@@ -13,6 +13,7 @@ from bhanuj_governance_plugin_api import (
     RuntimeReplaySource,
 )
 
+import aigp_langgraph_replay_adapter as public_api
 from aigp_langgraph_replay_adapter.adapter import (
     LangGraphReplayAdapter,
     LangGraphReplayError,
@@ -60,6 +61,23 @@ def test_plugin_registers_the_versioned_adapter_without_oss_imports(
         (item.adapter_id, item.adapter_version, item.adapter.name)
         for item in contributions.items
     ] == [("langgraph", "v1", "langgraph/v1")]
+
+
+def test_public_exports_preserve_v1_and_add_tool_node_v2() -> None:
+    expected = {
+        "LangGraphReplayAdapter",
+        "LangGraphToolCallBinding",
+        "LangGraphToolNodeReplayError",
+        "LangGraphToolNodeReplaySession",
+        "PrivateSnapshot",
+        "PrivateToolEvidence",
+        "PrivateToolEvidenceStore",
+        "SQLitePrivateSnapshotStore",
+        "TOOL_NODE_REPLAY_ADAPTER_ID",
+    }
+
+    assert set(public_api.__all__) == expected
+    assert all(hasattr(public_api, name) for name in expected)
 
 
 def test_plugin_without_worker_snapshot_configuration_remains_inert(
