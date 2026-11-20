@@ -4,7 +4,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "aigp-langgraph-replay-adapter"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "bhanuj-governance-plugin-api" },
@@ -19,7 +19,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bhanuj-governance-plugin-api", specifier = "==1.1.1" },
+    { name = "bhanuj-governance-plugin-api", specifier = "==1.2.0rc1" },
     { name = "langgraph", specifier = ">=0.2.74,<1" },
 ]
 
@@ -53,11 +53,11 @@ wheels = [
 
 [[package]]
 name = "bhanuj-governance-plugin-api"
-version = "1.1.1"
+version = "1.2.0rc1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9c/5a/21573d1397d7494db0cd1bdc22d60ee368f1ee79a67111c454e9dc7d8d6f/bhanuj_governance_plugin_api-1.1.1.tar.gz", hash = "sha256:6000cfca6c4006496e2ae50d45abfcc64ebeb7d376d427f5f30ccc85f92c8f1a", size = 10372, upload-time = "2026-10-25T22:50:37.236Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/3b/82871126b175e771b7c54a7ced59b677c427fd9a0a2d193f09c1aa520e77/bhanuj_governance_plugin_api-1.2.0rc1.tar.gz", hash = "sha256:a2ce8aeb1f7929d682ee9dca0300145b2e9b0fac9081349fb4998b6d73f4e205", size = 25696, upload-time = "2026-11-19T23:06:58.161Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/33/5626b5a160fef1f3be8664dbf94fb61e4fda9d0d3529227505012b0d67e4/bhanuj_governance_plugin_api-1.1.1-py3-none-any.whl", hash = "sha256:d6c26a8f73677f10b5b558212c63a141f192001f401b4ca0fed6777620e52300", size = 11814, upload-time = "2026-10-25T22:50:36.246Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/d8/0fd37d4a20a60f0da8da9929b1487b080af2c30a607d1a72c41b407ae356/bhanuj_governance_plugin_api-1.2.0rc1-py3-none-any.whl", hash = "sha256:ffb590afa4c5559d5d91d88a531d702392007f3eb8b2f119e632818a6f7202ae", size = 28720, upload-time = "2026-11-19T23:06:57.028Z" },
 ]
 
 [[package]]

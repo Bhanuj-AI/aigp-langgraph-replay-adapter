@@ -2,12 +2,19 @@
 
 ## Scope
 
-`v0.1.0` is a **reference counterfactual executor**, not an arbitrary
+`v0.2.0` preserves the existing `langgraph/v1` adapter as a **reference counterfactual executor**, not an arbitrary
 LangGraph workflow replayer. It resolves a runtime-private snapshot containing
 precomputed `baseline_score` and `counterfactual_scores`, then runs a small,
 isolated LangGraph graph to materialize the bounded counterfactual result.
 It does not load LangGraph checkpoints, reconstruct arbitrary graphs, invoke
 tools, or mutate external business systems.
+
+The opt-in ToolNode replay surface is a separate `langgraph/v2` boundary. It
+uses the published Plugin API resolver to substitute private recorded evidence
+for declared native `ToolNode` calls. It is intentionally not registered into
+the OSS replay worker until the later worker task supplies a frozen resolution
+plan, accepts the final resolver summary, and validates the resulting
+attestation.
 
 This independently owned runtime plugin implements `langgraph/v1` using only
 `bhanuj-governance-plugin-api`. It does not import AIGP OSS models, services,
@@ -31,7 +38,7 @@ pip install .
 
 For local development, use `pip install -e .`. The published Plugin API is a
 normal dependency and is resolved by the project at
-`bhanuj-governance-plugin-api==1.1.1`.
+`bhanuj-governance-plugin-api==1.2.0rc1`.
 
 The replay worker must be given its private snapshot location:
 
@@ -56,3 +63,20 @@ and then produces a bounded score, opaque outcome reference, and runtime
 attestation. The digest and attestation establish runtime consistency, not
 independent proof that an external mutation occurred. Snapshot contents never
 cross into AIGP.
+
+## Resolver-backed ToolNode replay (`langgraph/v2`)
+
+`LangGraphToolNodeReplaySession` is the first concrete interception boundary.
+It creates a real LangGraph `ToolNode` containing only resolver-backed tools;
+the original tool implementations are never accepted or invoked. The runtime
+privately supplies the native call ID, scope, schema, occurrence, dependencies,
+retry relationship, and a private evidence materialiser. The session derives a
+canonical argument digest, invokes `ExecutionReplayResolver`, and returns only
+the selected recorded or approved-replacement evidence to `ToolNode`.
+
+Independent calls may resolve in parallel through `ToolNode.ainvoke()` because
+the published resolver atomically matches and consumes each planned call. An
+unknown ToolNode name or an identity/digest mismatch terminates the attempted
+path without falling back to the original tool. Direct SDK, HTTP, database, and
+custom-node calls remain outside this declared boundary and are not represented
+as intercepted execution.
