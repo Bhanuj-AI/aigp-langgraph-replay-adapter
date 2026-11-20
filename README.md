@@ -80,3 +80,10 @@ unknown ToolNode name or an identity/digest mismatch terminates the attempted
 path without falling back to the original tool. Direct SDK, HTTP, database, and
 custom-node calls remain outside this declared boundary and are not represented
 as intercepted execution.
+
+The runtime must call `finalize()` before considering the session successful.
+It returns and retains the immutable `ReplayResolutionSummary`, including its
+completion state, consumed and remaining planned calls, blocking divergence
+count, and whether a required intervention was applied. Finalization seals the
+session: no further ToolNode invocation is allowed. A later OSS worker
+integration must validate this summary before accepting a replay result.

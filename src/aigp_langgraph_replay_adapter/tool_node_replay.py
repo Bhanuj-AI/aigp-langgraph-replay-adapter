@@ -16,8 +16,8 @@ from bhanuj_governance_plugin_api import (
     EvidenceResolutionPlan,
     ExecutionReplayResolver,
     ReplayInterventionBinding,
-    ReplayResolutionCompletion,
     ReplayResolutionOutcome,
+    ReplayResolutionSummary,
     ReplayToolCall,
     ReplayToolCallKind,
     ToolArgumentDigestAlgorithm,
@@ -129,6 +129,7 @@ class LangGraphToolNodeReplaySession:
         self._intervention_digest = (
             intervention.intervention_digest if intervention is not None else None
         )
+        self._resolution_summary: ReplayResolutionSummary | None = None
         by_runtime_id = {binding.runtime_tool_call_id: binding for binding in bindings}
         if len(by_runtime_id) != len(bindings):
             raise LangGraphToolNodeReplayError(
@@ -146,6 +147,7 @@ class LangGraphToolNodeReplaySession:
     def invoke(self, tool_calls: Sequence[Mapping[str, object]]) -> list[ToolMessage]:
         """Synchronously run native calls through a real LangGraph ``ToolNode``."""
 
+        self._require_open_session()
         result = self.tool_node.invoke(_tool_node_input(tool_calls))
         return _tool_messages(result)
 
@@ -154,13 +156,28 @@ class LangGraphToolNodeReplaySession:
     ) -> list[ToolMessage]:
         """Asynchronously run native calls; ToolNode may resolve them in parallel."""
 
+        self._require_open_session()
         result = await self.tool_node.ainvoke(_tool_node_input(tool_calls))
         return _tool_messages(result)
 
-    def finalize(self) -> ReplayResolutionCompletion:
-        """Return the session completion state for runtime-owned trace handling."""
+    @property
+    def resolution_summary(self) -> ReplayResolutionSummary | None:
+        """Return the immutable final summary after explicit session finalization."""
 
-        return self._resolver.finalize().completion
+        return self._resolution_summary
+
+    def finalize(self) -> ReplayResolutionSummary:
+        """Seal the session and retain complete, incomplete, or failed resolution evidence."""
+
+        if self._resolution_summary is None:
+            self._resolution_summary = self._resolver.finalize()
+        return self._resolution_summary
+
+    def _require_open_session(self) -> None:
+        if self._resolution_summary is not None:
+            raise LangGraphToolNodeReplayError(
+                "LangGraph ToolNode replay session is already finalized."
+            )
 
     def _resolver_tool(self, tool_symbol: str):
         @tool(tool_symbol, args_schema=_ResolverToolArguments)

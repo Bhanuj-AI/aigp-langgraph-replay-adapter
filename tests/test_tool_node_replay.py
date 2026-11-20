@@ -48,7 +48,11 @@ def test_tool_node_returns_recorded_evidence_without_an_original_tool() -> None:
     assert [(message.content, message.tool_call_id) for message in messages] == [
         ("historical account evidence", "native-1")
     ]
-    assert session.finalize() is ReplayResolutionCompletion.COMPLETE
+    summary = session.finalize()
+    assert summary.completion is ReplayResolutionCompletion.COMPLETE
+    assert summary.consumed_planned_call_ids == ("call-1",)
+    assert summary.remaining_planned_call_ids == ()
+    assert session.resolution_summary == summary
 
 
 def test_tool_node_uses_only_the_approved_intervention_evidence() -> None:
@@ -83,27 +87,39 @@ def test_tool_node_uses_only_the_approved_intervention_evidence() -> None:
     assert [message.content for message in messages] == [
         "approved replacement evidence"
     ]
-    assert session.finalize() is ReplayResolutionCompletion.COMPLETE
+    summary = session.finalize()
+    assert summary.completion is ReplayResolutionCompletion.COMPLETE
+    assert summary.consumed_planned_call_ids == ("call-1",)
+    assert summary.intervention_required is True
+    assert summary.intervention_applied_call_id == "call-1"
 
 
 @pytest.mark.parametrize(
-    "call",
+    ("call", "expected_completion"),
     (
-        {
-            "id": "native-unknown",
-            "name": "unplanned_tool",
-            "args": {"account_id": "A-1"},
-            "type": "tool_call",
-        },
-        {
-            "id": "native-1",
-            "name": "account_lookup",
-            "args": {"account_id": "forged"},
-            "type": "tool_call",
-        },
+        (
+            {
+                "id": "native-unknown",
+                "name": "unplanned_tool",
+                "args": {"account_id": "A-1"},
+                "type": "tool_call",
+            },
+            ReplayResolutionCompletion.INCOMPLETE,
+        ),
+        (
+            {
+                "id": "native-1",
+                "name": "account_lookup",
+                "args": {"account_id": "forged"},
+                "type": "tool_call",
+            },
+            ReplayResolutionCompletion.FAILED,
+        ),
     ),
 )
-def test_unknown_or_mismatched_tool_calls_fail_closed(call: dict[str, object]) -> None:
+def test_unknown_or_mismatched_tool_calls_fail_closed(
+    call: dict[str, object], expected_completion: ReplayResolutionCompletion
+) -> None:
     planned = _planned("call-1", "account_lookup", {"account_id": "A-1"}, "history")
     session = _session(
         _plan(planned),
@@ -118,7 +134,12 @@ def test_unknown_or_mismatched_tool_calls_fail_closed(call: dict[str, object]) -
     with pytest.raises(LangGraphToolNodeReplayError):
         session.invoke((call,))
 
-    assert session.finalize() is not ReplayResolutionCompletion.COMPLETE
+    summary = session.finalize()
+    assert summary.completion is expected_completion
+    assert summary.remaining_planned_call_ids == ("call-1",)
+    assert summary.blocking_divergence_count == (
+        1 if expected_completion is ReplayResolutionCompletion.FAILED else 0
+    )
 
 
 def test_async_parallel_independent_calls_resolve_in_one_session() -> None:
@@ -148,7 +169,31 @@ def test_async_parallel_independent_calls_resolve_in_one_session() -> None:
         "recorded account",
         "recorded risk",
     }
-    assert session.finalize() is ReplayResolutionCompletion.COMPLETE
+    summary = session.finalize()
+    assert summary.completion is ReplayResolutionCompletion.COMPLETE
+    assert summary.consumed_planned_call_ids == ("call-1", "call-2")
+    assert summary.remaining_planned_call_ids == ()
+
+
+def test_finalization_seals_the_session() -> None:
+    planned = _planned("call-1", "account_lookup", {"account_id": "A-1"}, "history")
+    session = _session(
+        _plan(planned),
+        (
+            LangGraphToolCallBinding(
+                "native-1", "account_lookup", "graph.root", "v1", 1
+            ),
+        ),
+        {"history": "historical account evidence"},
+    )
+
+    summary = session.finalize()
+
+    assert summary.completion is ReplayResolutionCompletion.INCOMPLETE
+    with pytest.raises(LangGraphToolNodeReplayError, match="already finalized"):
+        session.invoke(
+            (_tool_call("native-1", "account_lookup", {"account_id": "A-1"}),)
+        )
 
 
 def _session(
