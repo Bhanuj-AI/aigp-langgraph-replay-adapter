@@ -2,6 +2,18 @@
 
 All notable changes to this package are documented here.
 
+## [0.3.1] - 2026-11-21
+
+### Fixed
+
+- Moved the development-only replay-worker image and Compose overlay into this
+  adapter repository. The OSS control plane now remains free of
+  framework-specific deployment files.
+- Made the overlay portable through explicit absolute adapter and private
+  snapshot directory variables. It layers this adapter onto a supplied AIGP
+  worker image and mounts the runtime-owned snapshot directory read-only into
+  the worker only.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

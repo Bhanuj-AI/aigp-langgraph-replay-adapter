@@ -1,0 +1,19 @@
+# Overlay this onto the AIGP OSS Compose file for the local ToolNode v2 lab.
+# The adapter and runtime-private snapshot paths are deliberately explicit so
+# this adapter repository does not assume a sibling checkout layout.
+services:
+  ai-governance-replay-worker:
+    build:
+      context: ${AIGP_LANGGRAPH_REPLAY_ADAPTER_DIR:?Set AIGP_LANGGRAPH_REPLAY_ADAPTER_DIR to this checkout.}
+      dockerfile: Dockerfile.replay-worker
+      args:
+        AIGP_BASE_WORKER_IMAGE: ${AIGP_BASE_WORKER_IMAGE:-ai-governance-platform:local}
+    image: ${AIGP_LANGGRAPH_REPLAY_WORKER_IMAGE:-ai-governance-platform-langgraph-v2:local}
+    environment:
+      AIGP_LANGGRAPH_REPLAY_SNAPSHOT_DB: /var/lib/aigp-langgraph/langgraph-v2-snapshots.db
+    volumes:
+      # Runtime-owned private snapshots. The API and Studio do not mount it.
+      - type: bind
+        source: ${AIGP_LANGGRAPH_REPLAY_SNAPSHOT_DIR:?Set AIGP_LANGGRAPH_REPLAY_SNAPSHOT_DIR to the private snapshot directory.}
+        target: /var/lib/aigp-langgraph
+        read_only: true

@@ -22,7 +22,7 @@ class LangGraphReplayPlugin:
 
     metadata = PluginMetadata(
         name="langgraph-replay",
-        version="0.3.0",
+        version="0.3.1",
         required_ai_governance_version=">=1.2.4,<2",
         capabilities=("replay.execute",),
     )
