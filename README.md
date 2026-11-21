@@ -2,7 +2,7 @@
 
 ## Scope
 
-`v0.2.0` preserves the existing `langgraph/v1` adapter as a **reference counterfactual executor**, not an arbitrary
+`v0.3.1` preserves the existing `langgraph/v1` adapter as a **reference counterfactual executor**, not an arbitrary
 LangGraph workflow replayer. It resolves a runtime-private snapshot containing
 precomputed `baseline_score` and `counterfactual_scores`, then runs a small,
 isolated LangGraph graph to materialize the bounded counterfactual result.
@@ -54,6 +54,35 @@ no replay adapter is registered. A governed replay request consequently fails
 closed as unavailable rather than silently falling back. A manifest may still
 be replay-eligible when the current worker lacks the adapter; availability is
 an operational deployment concern, not historical evidence eligibility.
+
+### Local Docker worker
+
+This repository owns the development-only image and Compose overlay for the
+external adapter. The OSS repository remains framework-neutral. The overlay
+layers this package onto an already-built AIGP worker image and mounts the
+runtime-owned private snapshot directory read-only into that worker only.
+
+```sh
+# From this adapter checkout.
+export AIGP_LANGGRAPH_REPLAY_ADAPTER_DIR="$(pwd)"
+export AIGP_LANGGRAPH_REPLAY_SNAPSHOT_DIR="/absolute/path/to/runtime-data"
+export AIGP_BASE_WORKER_IMAGE=ai-governance-platform:local
+export AIGP_LANGGRAPH_REPLAY_WORKER_IMAGE=ai-governance-platform-langgraph-v2:local
+
+# Build the base control-plane image from its own checkout first.
+cd ../ai-governance-oss
+docker compose build ai-governance-platform
+docker compose -f docker-compose.yml \
+  -f ../adapters/aigp-langgraph-replay-adapter/docker-compose.replay-worker.yml \
+  build ai-governance-replay-worker
+docker compose -f docker-compose.yml \
+  -f ../adapters/aigp-langgraph-replay-adapter/docker-compose.replay-worker.yml \
+  up -d --force-recreate ai-governance-platform ai-governance-replay-worker
+```
+
+The API and Studio do not receive the snapshot mount. This is a deployment
+boundary for the declared ToolNode replay surface; it is not a claim of
+arbitrary workflow interception or sandbox-level isolation.
 
 Snapshot capture is immutable: the first writer for a replay reference wins;
 an identical later capture is idempotent, while a conflicting capture is

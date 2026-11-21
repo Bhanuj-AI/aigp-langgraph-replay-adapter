@@ -4,6 +4,7 @@ import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -65,6 +66,7 @@ def test_plugin_registers_the_versioned_adapter_without_oss_imports(
     plugin = LangGraphReplayPlugin()
     contributions = _Contributions()
 
+    assert plugin.metadata.version == version("aigp-langgraph-replay-adapter")
     plugin.validate(_PluginContext(contributions))
     plugin.register(_PluginContext(contributions))
 
