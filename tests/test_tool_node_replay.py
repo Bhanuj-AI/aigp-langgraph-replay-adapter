@@ -53,6 +53,9 @@ def test_tool_node_returns_recorded_evidence_without_an_original_tool() -> None:
     assert summary.consumed_planned_call_ids == ("call-1",)
     assert summary.remaining_planned_call_ids == ()
     assert session.resolution_summary == summary
+    assert session.execution_trace is not None
+    assert session.execution_trace.complete is True
+    assert session.execution_trace.resolutions[0].planned_call_id == "call-1"
 
 
 def test_tool_node_uses_only_the_approved_intervention_evidence() -> None:

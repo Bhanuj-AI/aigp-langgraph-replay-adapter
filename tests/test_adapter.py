@@ -5,12 +5,20 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from bhanuj_governance_plugin_api import (
+    EvidenceResolutionPlan,
+    ExecutionReplayCapability,
+    ReplayEvidenceBinding,
     ReplayExecutionContext,
     ReplayInterventionEnvelope,
+    ReplayToolCall,
+    ReplayToolCallKind,
     RuntimeReplaySource,
+    ToolArgumentDigestAlgorithm,
+    create_tool_argument_digest,
 )
 
 import aigp_langgraph_replay_adapter as public_api
@@ -22,6 +30,9 @@ from aigp_langgraph_replay_adapter.plugin import LangGraphReplayPlugin
 from aigp_langgraph_replay_adapter.snapshot_store import (
     PrivateSnapshotError,
     SQLitePrivateSnapshotStore,
+)
+from aigp_langgraph_replay_adapter.tool_node_adapter import (
+    LangGraphToolNodeReplayAdapter,
 )
 
 
@@ -60,13 +71,18 @@ def test_plugin_registers_the_versioned_adapter_without_oss_imports(
     assert [
         (item.adapter_id, item.adapter_version, item.adapter.name)
         for item in contributions.items
-    ] == [("langgraph", "v1", "langgraph/v1")]
+    ] == [
+        ("langgraph", "v1", "langgraph/v1"),
+        ("langgraph", "v2", "langgraph/v2"),
+    ]
 
 
 def test_public_exports_preserve_v1_and_add_tool_node_v2() -> None:
     expected = {
         "LangGraphReplayAdapter",
         "LangGraphToolCallBinding",
+        "LangGraphToolNodeReplayAdapter",
+        "LangGraphToolNodeReplayAdapterError",
         "LangGraphToolNodeReplayError",
         "LangGraphToolNodeReplaySession",
         "PrivateSnapshot",
@@ -74,10 +90,97 @@ def test_public_exports_preserve_v1_and_add_tool_node_v2() -> None:
         "PrivateToolEvidenceStore",
         "SQLitePrivateSnapshotStore",
         "TOOL_NODE_REPLAY_ADAPTER_ID",
+        "TOOL_NODE_REPLAY_RUNTIME_ADAPTER_ID",
     }
 
     assert set(public_api.__all__) == expected
     assert all(hasattr(public_api, name) for name in expected)
+
+
+def test_v2_adapter_returns_trace_and_attestation_from_private_evidence(
+    tmp_path: Path,
+) -> None:
+    source = _source(adapter_id="langgraph/v2", adapter_version="2")
+    arguments = {"account_id": "A-1"}
+    history = "recorded account evidence"
+    replacement = "approved replacement evidence"
+    plan = _v2_plan(arguments, _digest(history))
+    snapshots = SQLitePrivateSnapshotStore(tmp_path / "private-snapshots.db")
+    snapshots.capture(
+        replay_reference=source.replay_reference,
+        organization_id="org-a",
+        project_id="project-a",
+        external_execution_id=source.external_execution_id,
+        adapter_id=source.adapter_id,
+        adapter_version=source.adapter_version,
+        isolation_guarantee=source.isolation_guarantee,
+        manifest_hash=source.manifest_hash,
+        state={
+            "tool_node_replay": {
+                "schema_version": "langgraph-tool-node-replay-snapshot/v1",
+                "tool_calls": [
+                    {
+                        "planned_call_id": "tool-call-1",
+                        "runtime_tool_call_id": "native-account-1",
+                        "tool_symbol": "account_lookup",
+                        "scope_id": "graph.root",
+                        "tool_schema_version": "v1",
+                        "occurrence": 1,
+                        "dependency_call_ids": [],
+                        "arguments": arguments,
+                    }
+                ],
+                "evidence": {
+                    "private://history": {
+                        "content": history,
+                        "response_digest": _digest(history),
+                    },
+                    "private://replacement": {
+                        "content": replacement,
+                        "response_digest": _digest(replacement),
+                    },
+                },
+                "intervention_outcome_score": 0.2,
+            }
+        },
+    )
+    intervention = SimpleNamespace(
+        target_event_id="tool-call-1",
+        counterfactual_evidence_reference="private://replacement",
+        counterfactual_evidence_digest=_digest(replacement),
+        intervention_digest="f" * 64,
+    )
+    context = ReplayExecutionContext(
+        replay_id="replay-1",
+        source_execution_id="source-1",
+        new_execution_id="produced-1",
+        organization_id="org-a",
+        project_id="project-a",
+        actor_id="auditor",
+        request_id="request-1",
+        correlation_id="correlation-1",
+        attempt=1,
+        cancellation_token=_NotCancelled(),
+        metadata={},
+        controlled_evidence_intervention=intervention,
+        runtime_replay_source=source,
+        execution_replay_resolution_plan=plan,
+    )
+
+    result = LangGraphToolNodeReplayAdapter(snapshots).replay(
+        object(),
+        SimpleNamespace(execution_adapter="langgraph/v2"),
+        context,
+    )
+
+    assert result.final_state["causal_audit_outcome_score"] == 0.2
+    assert result.execution_replay_trace is not None
+    assert result.execution_replay_trace.complete is True
+    assert result.execution_replay_attestation is not None
+    assert result.execution_replay_attestation.complete is True
+    assert result.metadata["evidence_only_replay_safety"][
+        "runtime_tool_call_id"
+    ] == "native-account-1"
 
 
 def test_plugin_without_worker_snapshot_configuration_remains_inert(
@@ -333,3 +436,53 @@ def _capture(
             "counterfactual_scores": {"sha256:counterfactual": score},
         },
     )
+
+
+def _v2_plan(
+    arguments: dict[str, object], response_digest: str
+) -> EvidenceResolutionPlan:
+    planned = ReplayToolCall(
+        call_id="tool-call-1",
+        kind=ReplayToolCallKind.PLANNED,
+        scope_id="graph.root",
+        tool_symbol="account_lookup",
+        tool_schema_version="v1",
+        argument_digest=create_tool_argument_digest(
+            arguments, algorithm=ToolArgumentDigestAlgorithm.SHA256_JSON_V1
+        ),
+        occurrence=1,
+        evidence_reference="private://history",
+        response_digest=response_digest,
+    )
+    return EvidenceResolutionPlan(
+        organization_id="org-a",
+        project_id="project-a",
+        source_execution_id="aigp-execution-1",
+        replay_manifest_hash="a" * 64,
+        capability=ExecutionReplayCapability(
+            supported_tool_boundaries=("langgraph.tool-node",),
+            unsupported_execution_surfaces=("direct-sdk-calls",),
+            argument_digest_algorithms=(ToolArgumentDigestAlgorithm.SHA256_JSON_V1,),
+            max_trace_size=8,
+            supports_async_tools=True,
+            supports_subgraphs=False,
+            supports_retries=True,
+            supports_concurrent_execution=True,
+            evidence_only=True,
+            no_original_tool_fallback=True,
+        ),
+        planned_calls=(planned,),
+        evidence_bindings=(
+            ReplayEvidenceBinding(
+                planned.call_id,
+                planned.evidence_reference or "",
+                planned.response_digest or "",
+            ),
+        ),
+    )
+
+
+def _digest(content: str) -> str:
+    import hashlib
+
+    return "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest()
