@@ -11,10 +11,10 @@ tools, or mutate external business systems.
 
 The opt-in ToolNode replay surface is a separate `langgraph/v2` boundary. It
 uses the published Plugin API resolver to substitute private recorded evidence
-for declared native `ToolNode` calls. It is intentionally not registered into
-the OSS replay worker until the later worker task supplies a frozen resolution
-plan, accepts the final resolver summary, and validates the resulting
-attestation.
+for declared native `ToolNode` calls. When an OSS worker receives a frozen
+resolution plan and authorised intervention binding, the adapter emits the
+typed execution trace, evidence-only safety report, and attestation that the
+worker independently reconciles before accepting the replay result.
 
 This independently owned runtime plugin implements `langgraph/v1` using only
 `bhanuj-governance-plugin-api`. It does not import AIGP OSS models, services,

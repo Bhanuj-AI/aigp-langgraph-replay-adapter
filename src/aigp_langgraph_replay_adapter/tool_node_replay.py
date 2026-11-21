@@ -9,17 +9,21 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from threading import Lock
 from types import MappingProxyType
 from typing import Annotated, Any
 
 from bhanuj_governance_plugin_api import (
     EvidenceResolutionPlan,
     ExecutionReplayResolver,
+    ReplayExecutionTrace,
     ReplayInterventionBinding,
+    ReplayResolutionCompletion,
     ReplayResolutionOutcome,
     ReplayResolutionSummary,
     ReplayToolCall,
     ReplayToolCallKind,
+    ReplayToolResolution,
     ToolArgumentDigestAlgorithm,
     ToolArgumentDigestKeyProvider,
     create_tool_argument_digest,
@@ -130,6 +134,9 @@ class LangGraphToolNodeReplaySession:
             intervention.intervention_digest if intervention is not None else None
         )
         self._resolution_summary: ReplayResolutionSummary | None = None
+        self._trace_lock = Lock()
+        self._attempted_calls: dict[str, ReplayToolCall] = {}
+        self._resolutions: dict[str, ReplayToolResolution] = {}
         by_runtime_id = {binding.runtime_tool_call_id: binding for binding in bindings}
         if len(by_runtime_id) != len(bindings):
             raise LangGraphToolNodeReplayError(
@@ -165,6 +172,22 @@ class LangGraphToolNodeReplaySession:
         """Return the immutable final summary after explicit session finalization."""
 
         return self._resolution_summary
+
+    @property
+    def execution_trace(self) -> ReplayExecutionTrace | None:
+        """Return the bounded trace only after the ToolNode session is sealed."""
+
+        if self._resolution_summary is None:
+            return None
+        with self._trace_lock:
+            return ReplayExecutionTrace(
+                attempted_calls=tuple(self._attempted_calls.values()),
+                resolutions=tuple(self._resolutions.values()),
+                complete=(
+                    self._resolution_summary.completion
+                    is ReplayResolutionCompletion.COMPLETE
+                ),
+            )
 
     def finalize(self) -> ReplayResolutionSummary:
         """Seal the session and retain complete, incomplete, or failed resolution evidence."""
@@ -230,6 +253,7 @@ class LangGraphToolNodeReplaySession:
         resolution = self._resolver.resolve(
             attempted, intervention_digest=self._intervention_digest
         )
+        self._record_resolution(attempted, resolution)
         if resolution.outcome not in {
             ReplayResolutionOutcome.RESOLVED_RECORDED,
             ReplayResolutionOutcome.RESOLVED_INTERVENTION,
@@ -248,6 +272,15 @@ class LangGraphToolNodeReplaySession:
             resolution.selected_evidence_reference,
             resolution.selected_response_digest,
         )
+
+    def _record_resolution(
+        self, attempted: ReplayToolCall, resolution: ReplayToolResolution
+    ) -> None:
+        """Capture one bounded resolver outcome while ToolNode calls run in parallel."""
+
+        with self._trace_lock:
+            self._attempted_calls.setdefault(attempted.call_id, attempted)
+            self._resolutions.setdefault(resolution.attempted_call_id, resolution)
 
 
 def _tool_node_input(tool_calls: Sequence[Mapping[str, object]]) -> dict[str, object]:

@@ -1,6 +1,6 @@
 [project]
 name = "aigp-langgraph-replay-adapter"
-version = "0.2.0"
+version = "0.3.0"
 description = "AIGP LangGraph Replay Adapter that privately resolves snapshots, executes isolated replay, and returns bounded results."
 readme = "README.md"
 requires-python = ">=3.12"

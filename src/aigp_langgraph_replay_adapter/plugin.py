@@ -12,6 +12,9 @@ from bhanuj_governance_plugin_api import (
 
 from aigp_langgraph_replay_adapter.adapter import LangGraphReplayAdapter
 from aigp_langgraph_replay_adapter.snapshot_store import SQLitePrivateSnapshotStore
+from aigp_langgraph_replay_adapter.tool_node_adapter import (
+    LangGraphToolNodeReplayAdapter,
+)
 
 
 class LangGraphReplayPlugin:
@@ -19,7 +22,7 @@ class LangGraphReplayPlugin:
 
     metadata = PluginMetadata(
         name="langgraph-replay",
-        version="0.2.0",
+        version="0.3.0",
         required_ai_governance_version=">=1.2.4,<2",
         capabilities=("replay.execute",),
     )
@@ -41,9 +44,16 @@ class LangGraphReplayPlugin:
     def register(self, context) -> None:
         if self._snapshot_path is None:
             return
-        adapter = LangGraphReplayAdapter(SQLitePrivateSnapshotStore(self._snapshot_path))
+        snapshots = SQLitePrivateSnapshotStore(self._snapshot_path)
         context.contributions.replay_execution_adapters(
-            (ReplayExecutionAdapterContribution("langgraph", "v1", adapter),)
+            (
+                ReplayExecutionAdapterContribution(
+                    "langgraph", "v1", LangGraphReplayAdapter(snapshots)
+                ),
+                ReplayExecutionAdapterContribution(
+                    "langgraph", "v2", LangGraphToolNodeReplayAdapter(snapshots)
+                ),
+            )
         )
 
     def start(self, context) -> None:
